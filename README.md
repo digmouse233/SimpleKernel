@@ -1,7 +1,7 @@
 
-# print_only
+# raspi2_dev
 
-仅有输出函数的
+添加对树莓派 2 的支持
 
 raspi2:
 
