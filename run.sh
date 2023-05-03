@@ -1,7 +1,9 @@
 
-# This file is a part of Simple-XX/SimpleKernel (https://github.com/Simple-XX/SimpleKernel).
+# This file is a part of Simple-XX/SimpleKernel 
+# (https://github.com/Simple-XX/SimpleKernel).
 #
-# setup.sh for Simple-XX/SimpleKernel.
+# run.sh for Simple-XX/SimpleKernel.
+# 在虚拟机中运行内核
 
 #!/bin/bash
 # shell 执行出错时终止运行
@@ -16,24 +18,34 @@ export PATH="${GRUB_PATH}:$PATH"
 mkdir -p ./build/
 rm -rf ./build/*
 cd ./build
-cmake -DCMAKE_TOOLCHAIN_FILE=./cmake/${TOOLS} -DPLATFORM=${SIMULATOR} -DARCH=${ARCH} -DCMAKE_BUILD_TYPE=DEBUG ..
+cmake -DCMAKE_TOOLCHAIN_FILE=./cmake/${TOOLS} -DARCH=${ARCH} -DCMAKE_BUILD_TYPE=DEBUG ..
 make
 cd ../
 
-
-if [ ${ARCH} == "i386" ]; then
+# 如果是 i386/x86_64，需要判断是否符合 multiboot2 标准
+if [ ${ARCH} == "i386" ] || [ ${ARCH} == "x86_64" ]; then
     if ${GRUB_PATH}/grub-file --is-x86-multiboot2 ${kernel}; then
         echo Multiboot2 Confirmed!
+    else
+        echo NOT Multiboot2!
+        exit
     fi
-elif [ ${ARCH} == "x86_64" ]; then
-    if ${GRUB_PATH}/grub-file --is-x86-multiboot2 ${kernel}_boot; then
-        echo Multiboot2 Confirmed!
+fi
+
+# 如果是 riscv 64，需要使用 opensbi
+if [ ${ARCH} == "riscv64" ]; then
+    # OPENSBI 不存在则编译
+    if [ ! -f ${OPENSBI} ]; then
+        echo build opensbi.
+        git submodule init
+        git submodule update
+        cd ./tools/opensbi
+        mkdir -p build
+        export CROSS_COMPILE=${TOOLCHAIN_PREFIX}
+        make PLATFORM=generic FW_JUMP_ADDR=0x80200000
+        cd ../..
+        echo build opensbi done.
     fi
-elif [ ${ARCH} == "raspi2" ]; then
-    echo Arm-A7.
-else
-    echo The File is Not Multiboot.
-    exit
 fi
 
 # 检测路径是否合法，发生过 rm -rf -f /* 的惨剧
@@ -44,14 +56,11 @@ else
     rm -rf -f ${iso_boot}/*
 fi
 
-cp ${kernel} ${iso_boot}
-if [ ${ARCH} == "x86_64" ]; then
-    cp ${kernel}_boot ${iso_boot}
-fi
-mkdir ${iso_boot_grub}
-touch ${iso_boot_grub}/grub.cfg
-
-if [ ${ARCH} == "i386" ]; then
+# 设置 grub 相关数据
+if [ ${ARCH} == "i386" ] || [ ${ARCH} == "x86_64" ]; then
+    cp ${kernel} ${iso_boot}
+    mkdir ${iso_boot_grub}
+    touch ${iso_boot_grub}/grub.cfg
     echo 'set timeout=15
     set default=0
     menuentry "SimpleKernel" {
@@ -59,20 +68,19 @@ if [ ${ARCH} == "i386" ]; then
    }' >${iso_boot_grub}/grub.cfg
 fi
 
-if [ ${ARCH} == "x86_64" ]; then
-    echo 'set timeout=15
-    set default=0
-    menuentry "SimpleKernel" {
-       multiboot2 /boot/kernel.elf_boot "KERNEL_ELF_boot"
-   }' >${iso_boot_grub}/grub.cfg
-fi
-
-if [ ${ARCH} == "i386" ]; then
-    ${GRUB_PATH}/grub-mkrescue -o ${iso} ${iso_folder}
-    ${SIMULATOR} -q -f ${bochsrc} -rc ./tools/bochsinit
-elif [ ${ARCH} == "x86_64" ]; then
-    ${GRUB_PATH}/grub-mkrescue -o ${iso} ${iso_folder}
-    ${SIMULATOR} -q -f ${bochsrc} -rc ./tools/bochsinit
-elif [ ${ARCH} == "raspi2" ]; then
-    ${SIMULATOR}-system-aarch64 -machine raspi2 -serial stdio -kernel ${kernel} 
+# 运行虚拟机
+if [ ${ARCH} == "i386" ] || [ ${ARCH} == "x86_64" ]; then
+    if [ ${IA32_USE_QEMU} == 0 ]; then
+        ${GRUB_PATH}/grub-mkrescue -o ${iso} ${iso_folder}
+        bochs -q -f ${bochsrc} -rc ./tools/bochsinit
+    else
+        qemu-system-x86_64 -cdrom ${iso} -m 128M \
+        -monitor telnet::2333,server,nowait -serial stdio
+    fi
+elif [ ${ARCH} == "aarch64" ]; then
+    qemu-system-aarch64 -machine virt -cpu cortex-a72 -kernel ${kernel} \
+    -monitor telnet::2333,server,nowait -serial stdio -nographic
+elif [ ${ARCH} == "riscv64" ]; then
+    qemu-system-riscv64 -machine virt -bios ${OPENSBI} -kernel ${kernel} \
+    -monitor telnet::2333,server,nowait -serial stdio -nographic
 fi

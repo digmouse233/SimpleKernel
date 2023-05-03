@@ -1,33 +1,22 @@
 
-# This file is a part of Simple-XX/SimpleKernel (https://github.com/Simple-XX/SimpleKernel).
+# This file is a part of Simple-XX/SimpleKernel 
+# (https://github.com/Simple-XX/SimpleKernel).
 #
 # setup.sh for Simple-XX/SimpleKernel.
+# 指定要运行的 ARCH，并设置相关数据
 
 #!/bin/bash
 
-# env.sh path
-TOOLS_DIR=$(cd $(dirname ${BASH_SOURCE:-$0});pwd)
-# ARCH: i386, x86_64, raspi2
-ARCH="i386"
-# ARCH="x86_64" # TODO, cannot use
-# ARCH="raspi2" # TODO, cannot use
-# 虚拟机: bochs, qemu
-if [ "${ARCH}" == "i386" ]; then
-    SIMULATOR="bochs"
-elif [ "${ARCH}" == "x86_64" ]; then
-    SIMULATOR="bochs"
-elif [ "${ARCH}" == "raspi2" ]; then
-    SIMULATOR="qemu"
-fi
+# ARCH: i386, x86_64, riscv64
+# ARCH="i386"
+# ARCH="x86_64"
+ARCH="riscv64"
+
+# Use qeme for i386/x86_64, bochs for default
+IA32_USE_QEMU=0
+
 # 内核映像
 kernel='./build/bin/kernel.elf'
-bootloader='./build/bin/bootloader.bin'
-# 软盘
-disk='./simplekernel.img'
-# 安装目录
-boot_folder='./boot_folder/boot/'
-# 挂载目录
-folder='./boot_folder'
 iso_boot_grub='./iso/boot/grub'
 iso_boot='./iso/boot/'
 iso='./simplekernel.iso'
@@ -36,23 +25,27 @@ iso_folder='./iso/'
 OS=`uname -s`
 # toolchain
 if [ "${OS}" == "Linux" ]; then
-    if [ "${ARCH}" == "i386" ]; then
+    if [ "${ARCH}" == "i386" ] || [ "${ARCH}" == "x86_64" ]; then
         TOOLS="toolchain_linux_x86_64.cmake"
-    elif [ "${ARCH}" == "x86_64" ]; then
-        TOOLS="toolchain_linux_x86_64.cmake"
-    elif [ "${ARCH}" == "raspi2" ]; then
-        TOOLS="toolchain_linux_arm.cmake"
+    elif [ "${ARCH}" == "aarch64" ]; then
+        TOOLS="toolchain_linux_aarch64.cmake"
+    elif [ "${ARCH}" == "riscv64" ]; then
+        TOOLS="toolchain_linux_riscv.cmake"
+        TOOLCHAIN_PREFIX=riscv64-linux-gnu-
     fi
+    OPENSBI="$(pwd)/tools/opensbi/build/platform/generic/firmware/fw_jump.elf"
     GRUB_PATH="$(dirname $(which grub-file))"
     bochsrc="./tools/bochsrc_linux.txt"
 elif [ "${OS}" == "Darwin" ]; then
-    if [ "${ARCH}" == "i386" ]; then
+    if [ "${ARCH}" == "i386" ] || [ "${ARCH}" == "x86_64" ]; then
         TOOLS="toolchain_mac_x86_64.cmake"
-    elif [ "${ARCH}" == "x86_64" ]; then
-        TOOLS="toolchain_mac_x86_64.cmake"
-    elif [ "${ARCH}" == "raspi2" ]; then
-        TOOLS="toolchain_mac_arm.cmake"
+    elif [ "${ARCH}" == "aarch64" ]; then
+        TOOLS="toolchain_mac_aarch64.cmake"
+    elif [ "${ARCH}" == "riscv64" ]; then
+        TOOLS="toolchain_mac_riscv.cmake"
+        TOOLCHAIN_PREFIX=riscv64-unknown-elf-
     fi
+    OPENSBI="$(pwd)/tools/opensbi/build/platform/generic/firmware/fw_jump.elf"
     GRUB_PATH="$(pwd)/tools/grub-2.04/build/grub/bin"
     bochsrc="./tools/bochsrc_mac.txt"
 fi

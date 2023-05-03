@@ -1,14 +1,14 @@
 
 # This file is a part of Simple-XX/SimpleKernel (https://github.com/Simple-XX/SimpleKernel).
 #
-# bochsrc_mac.txt for Simple-XX/SimpleKernel
+# bochsrc_linux.txt for Simple-XX/SimpleKernel
 
 ata1-master: type=cdrom, path="simplekernel.iso", status=inserted
 boot: cdrom
 
 # log: ./debug_info/bochsout.txt
 
-megs: 2048
+megs: 128
 # Memory Detection in Emulators
 # When you tell an emulator how much memory you want emulated, the concept is a little 
 # "fuzzy" because of the emulated missing bits of RAM below 1M. If you tell an emulator to 
